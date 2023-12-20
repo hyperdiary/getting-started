@@ -2,13 +2,11 @@ package com.example.gettingstarted;
 
 import com.inrupt.client.auth.Session;
 import com.inrupt.client.openid.OpenIdSession;
-import com.inrupt.client.solid.SolidSyncClient;
+import com.inrupt.client.solid.*;
 import com.inrupt.client.webid.WebIdProfile;
-import com.inrupt.client.solid.PreconditionFailedException;
-import com.inrupt.client.solid.ForbiddenException;
-import com.inrupt.client.solid.NotFoundException;
 import org.springframework.web.bind.annotation.*;
 import org.apache.commons.rdf.api.RDFSyntax;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -142,6 +140,65 @@ public class ExpenseController {
         } catch(Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Note 9: Stores a non-RDF resource to a Pod
+     *
+     * Using SolidNonRDFSource and the SolidSyncClient .create() method,
+     * - Saves a non-RDF resource at the destinationURL.
+     */
+    @PutMapping("/resource/nonRDF/add")
+    public String addNonRDFFile(@RequestParam(value = "destinationURL") String destinationURL,
+                                @RequestParam(value = "file") MultipartFile file) {
+        printWriter.println("In addNonRDFFile:: Save Non-RDF File to Pod.");
+        try (final var fileStream = file.getInputStream()) {
+
+            SolidNonRDFSource myNonRDFFile = new SolidNonRDFSource(URI.create(destinationURL).normalize(), file.getContentType(), fileStream);
+            return client.create(myNonRDFFile).getIdentifier().toString();
+        } catch(PreconditionFailedException e1) {
+            // Errors if the resource already exists
+            printWriter.println(String.format("[%s] com.inrupt.client.solid.PreconditionFailedException in addNonRDFFile:: %s", e1.getStatusCode(), e1.getMessage()));
+        } catch(ForbiddenException e2) {
+            // Errors if user does not have access to create
+            printWriter.println(String.format("[%s] com.inrupt.client.solid.ForbiddenException in addNonRDFFile:: %s", e2.getStatusCode(), e2.getMessage()));
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    /**
+     * Note 10: Stores a non-RDF resource (image of the receipt) to a Pod and Attach to an Expense
+     * Using methods defined as part of getting started, addReceiptToExpense:
+     * - Calls addNonRDFFile() to store the receipt to a Pod
+     * - Calls getExpense() to fetch the associated Expense RDF resource.
+     * - Calls the Expense's setter `addReceipt` to add the link to the saved receipt.
+     * - Calls updateExpense() to save the updated Expense.
+     */
+    @PutMapping("/expenses/receipts/add")
+    public Expense addReceiptToExpense(@RequestParam(value = "destinationURL") String destinationURL,
+                                       @RequestParam(value = "file") MultipartFile file,
+                                       @RequestParam(value = "expenseURL") String expenseURL) {
+        printWriter.println("In addReceiptToExpense: Save Receipt File to Pod and Update Associated Expense.");
+        try {
+            String receiptLocation = addNonRDFFile(destinationURL, file);
+            if (receiptLocation != null) {
+                Expense expense = getExpense(expenseURL);
+                expense.addReceipt(receiptLocation);
+                return updateExpense(expense);
+            } else {
+                printWriter.println("Error adding receipt");
+                return null;
+            }
+        } catch(ForbiddenException e2) {
+            // Errors if user does not have access to read or update the Expense resource
+            printWriter.println(String.format("[%s] com.inrupt.client.solid.ForbiddenException in addReceiptToExpense:: %s", e2.getStatusCode(), e2.getMessage()));
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**

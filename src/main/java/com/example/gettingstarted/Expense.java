@@ -18,7 +18,9 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 
 /**
@@ -43,6 +45,8 @@ public class Expense extends SolidRDFSource {
     static IRI SCHEMA_ORG_TOTAL_PRICE = rdf.createIRI("https://schema.org/totalPrice");
     static IRI SCHEMA_ORG_PRICE_CURRENCY = rdf.createIRI("https://schema.org/priceCurrency");
     static IRI SCHEMA_ORG_CATEGORY = rdf.createIRI("https://schema.org/category");
+    static IRI SCHEMA_ORG_IMAGE = rdf.createIRI("https://schema.org/image");
+
 
     /**
      * Note 2b: Value Definition
@@ -83,7 +87,8 @@ public class Expense extends SolidRDFSource {
                    @JsonProperty("description") String description,
                    @JsonProperty("amount") BigDecimal amount,
                    @JsonProperty("currency") String currency,
-                   @JsonProperty("category") String category) {
+                   @JsonProperty("category") String category,
+                   @JsonProperty("receipts") String[] receipts) {
         this(identifier.normalize());
         this.setRDFType(MY_RDF_TYPE_VALUE);
         this.setMerchantProvider(merchantProvider);
@@ -92,6 +97,7 @@ public class Expense extends SolidRDFSource {
         this.setAmount(amount);
         this.setCurrency(currency);
         this.setCategory(category);
+        this.setReceipts(receipts);
     }
 
     /**
@@ -153,6 +159,19 @@ public class Expense extends SolidRDFSource {
 
     public void setCategory(String category) {
         subject.setCategory(category);
+    }
+
+    public Set<String> getReceipts() {
+        return subject.getReceipts();
+    }
+
+    // Note:: The setters first uses the getter, which returns a Set, and adds the receipt to the set.
+    public void addReceipt(String receipt) {
+        subject.getReceipts().add(receipt);
+    }
+
+    public void setReceipts(String[] receipts) {
+        subject.getReceipts().addAll(List.of(receipts));
     }
 
     /**
@@ -248,6 +267,10 @@ public class Expense extends SolidRDFSource {
 
         public void setCategory(String category) {
             overwriteNullable(SCHEMA_ORG_CATEGORY, category, TermMappings::asStringLiteral);
+        }
+
+        public Set<String> getReceipts() {
+            return objects(SCHEMA_ORG_IMAGE, TermMappings::asIri, ValueMappings::iriAsString);
         }
 
     }
